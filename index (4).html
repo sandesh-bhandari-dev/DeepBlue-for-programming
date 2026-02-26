@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MIDNIGHT HIGHWAY</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;font-family:'Share Tech Mono',monospace;color:#fff;cursor:none}
+canvas#c{display:block;position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:1}
+/* Bloom overlay */
+#bloom-canvas{position:fixed;top:0;left:0;width:100%;height:100%;z-index:2;pointer-events:none;mix-blend-mode:screen;opacity:0.55}
+/* Grain */
+#grain{position:fixed;top:-50%;left:-50%;width:200%;height:200%;pointer-events:none;z-index:8;opacity:0.05;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation:gr 0.45s steps(1) infinite}
+@keyframes gr{
+  0%,100%{transform:translate(0,0)}10%{transform:translate(-2%,-3%)}20%{transform:translate(3%,2%)}
+  30%{transform:translate(-1%,4%)}40%{transform:translate(2%,-1%)}50%{transform:translate(-3%,1%)}
+  60%{transform:translate(1%,-2%)}70%{transform:translate(-2%,3%)}80%{transform:translate(3%,-3%)}90%{transform:translate(-1%,2%)}
+}
+/* Chromatic aberration scanlines */
+#scanlines{position:fixed;top:0;left:0;width:100%;height:100%;z-index:9;pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px)}
+/* Vignette */
+#vig{position:fixed;top:0;left:0;width:100%;height:100%;z-index:10;pointer-events:none;
+  background:radial-gradient(ellipse at 50% 70%,transparent 30%,rgba(0,0,8,0.92) 100%)}
+/* Rain */
+#rain-c{position:fixed;top:0;left:0;width:100%;height:100%;z-index:11;pointer-events:none;opacity:0;transition:opacity 1.2s}
+/* Topbar */
+#topbar{position:fixed;top:0;left:0;right:0;height:50px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 22px;z-index:20;background:linear-gradient(to bottom,rgba(0,0,10,0.8),transparent);transition:opacity 0.6s}
+.logo{font-family:'Orbitron',monospace;font-size:11px;letter-spacing:0.55em;opacity:0.4}
+#clock{font-size:10px;letter-spacing:0.25em;opacity:0.35}
+/* Speed HUD */
+#hud{position:fixed;left:22px;bottom:22px;z-index:20;transition:opacity 0.6s}
+#hud.hidden{opacity:0}
+#spd{font-family:'Orbitron',monospace;font-size:44px;font-weight:900;line-height:1;
+  text-shadow:0 0 30px rgba(255,51,102,0.4)}
+#spd-unit{font-size:9px;letter-spacing:0.45em;opacity:0.3;margin-top:3px}
+#bpm-disp{font-size:9px;letter-spacing:0.25em;opacity:0.22;margin-top:8px}
+/* Right controls */
+#ctrl-panel{position:fixed;right:20px;top:50%;transform:translateY(-50%);z-index:20;display:flex;flex-direction:column;gap:8px;transition:opacity 0.6s}
+#ctrl-panel.hidden{opacity:0;pointer-events:none}
+.pill{background:rgba(4,4,18,0.85);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.07);
+  border-radius:30px;padding:9px 18px;font-size:9px;letter-spacing:0.22em;cursor:pointer;
+  transition:all 0.25s;opacity:0.5;user-select:none;text-align:center}
+.pill:hover{opacity:1;border-color:rgba(255,255,255,0.2)}
+.pill.on{opacity:1;border-color:#ff3366;color:#ff3366;box-shadow:0 0 16px rgba(255,51,102,0.2)}
+/* Music panel */
+#panel{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:20;
+  background:rgba(4,4,18,0.9);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.07);
+  border-radius:14px;padding:18px 22px;width:400px;transition:opacity 0.5s,transform 0.5s}
+#panel.hidden{opacity:0;transform:translateX(-50%) translateY(20px);pointer-events:none}
+#connect-screen{text-align:center}
+#connect-screen h2{font-family:'Orbitron',monospace;font-size:10px;letter-spacing:0.4em;opacity:0.4;margin-bottom:8px}
+#connect-screen p{font-size:9px;opacity:0.28;line-height:1.8;margin-bottom:16px}
+#sp-btn{background:#1DB954;color:#000;border:none;padding:11px 30px;border-radius:30px;
+  font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:0.18em;cursor:pointer;transition:all 0.25s}
+#sp-btn:hover{transform:scale(1.04);box-shadow:0 0 24px rgba(29,185,84,0.45)}
+#demo-btn{display:block;margin:12px auto 0;background:none;border:1px solid rgba(255,255,255,0.1);
+  color:rgba(255,255,255,0.35);padding:8px 24px;border-radius:30px;font-family:'Share Tech Mono',monospace;
+  font-size:9px;letter-spacing:0.2em;cursor:pointer;transition:all 0.25s}
+#demo-btn:hover{border-color:rgba(255,51,102,0.5);color:#ff3366}
+#now-playing{display:none}
+#now-playing.active{display:flex;align-items:center;gap:14px}
+#art{width:54px;height:54px;border-radius:8px;background:linear-gradient(135deg,#000033,#110022);
+  object-fit:cover;flex-shrink:0;box-shadow:0 0 24px rgba(255,51,102,0.25)}
+#tinfo{flex:1;min-width:0}
+#tname{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px}
+#tartist{font-size:9px;opacity:0.35;letter-spacing:0.12em}
+#prog{height:2px;background:rgba(255,255,255,0.07);border-radius:2px;margin-top:10px;overflow:hidden}
+#prog-fill{height:100%;width:0%;background:linear-gradient(90deg,#ff3366,#ff6633);border-radius:2px;
+  box-shadow:0 0 10px #ff3366;transition:width 1s linear}
+.ctrls{display:flex;align-items:center;gap:10px;margin-top:9px}
+.cb{background:none;border:none;color:rgba(255,255,255,0.4);cursor:pointer;font-size:14px;padding:4px;
+  transition:color 0.2s;font-family:'Share Tech Mono',monospace}
+.cb:hover{color:#fff}
+#ttime{margin-left:auto;font-size:9px;opacity:0.28;letter-spacing:0.1em}
+/* Focus hint */
+#fhint{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);font-size:9px;letter-spacing:0.4em;
+  opacity:0;pointer-events:none;z-index:20;color:rgba(255,255,255,0.28);transition:opacity 1s}
+/* Custom cursor */
+#cur{position:fixed;width:7px;height:7px;background:#ff3366;border-radius:50%;pointer-events:none;
+  z-index:9999;transform:translate(-50%,-50%);box-shadow:0 0 14px #ff3366}
+/* INTRO */
+#intro{position:fixed;top:0;left:0;right:0;bottom:0;background:#000006;z-index:100;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity 1.8s}
+#intro.fade{opacity:0;pointer-events:none}
+.iline{width:1px;height:55px;background:linear-gradient(to bottom,transparent,rgba(255,255,255,0.14),transparent);margin:14px 0}
+#intro h1{font-family:'Orbitron',monospace;font-size:clamp(24px,4.5vw,52px);font-weight:900;letter-spacing:0.6em}
+#intro h1.r{color:#ff3366;text-shadow:0 0 60px rgba(255,51,102,0.5),0 0 120px rgba(255,51,102,0.2)}
+#intro p{font-size:9px;letter-spacing:0.55em;opacity:0.18;margin-top:8px}
+#ign-btn{margin-top:48px;background:none;border:1px solid rgba(255,255,255,0.16);color:rgba(255,255,255,0.5);
+  padding:14px 44px;border-radius:30px;font-family:'Share Tech Mono',monospace;font-size:10px;
+  letter-spacing:0.4em;cursor:pointer;transition:all 0.35s}
+#ign-btn:hover{border-color:#ff3366;color:#ff3366;box-shadow:0 0 32px rgba(255,51,102,0.2)}
+/* VHS timestamp corner */
+#vhs{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:20;
+  font-size:9px;letter-spacing:0.2em;opacity:0.15;transition:opacity 0.6s}
+</style>
+</head>
+<body>
+<div id="cur"></div>
+<div id="grain"></div>
+<div id="scanlines"></div>
+<div id="vig"></div>
+<canvas id="rain-c"></canvas>
+<canvas id="bloom-canvas"></canvas>
+
+<div id="intro">
+  <div class="iline"></div>
+  <h1>MIDNIGHT</h1>
+  <h1 class="r">HIGHWAY</h1>
+  <p>A NEVER-ENDING ROAD</p>
+  <div class="iline"></div>
+  <button id="ign-btn">START ENGINE</button>
+</div>
+
+<canvas id="c"></canvas>
+
+<div id="topbar">
+  <div class="logo">MIDNIGHT HIGHWAY</div>
+  <div id="clock">00:00</div>
+</div>
+<div id="vhs">REC ● 00:00:00</div>
+
+<div id="hud">
+  <div id="spd">000</div>
+  <div id="spd-unit">KM/H</div>
+  <div id="bpm-disp">BPM: ---</div>
+</div>
+
+<div id="ctrl-panel">
+  <div class="pill" id="rain-btn">RAIN</div>
+  <div class="pill" id="focus-btn">FOCUS</div>
+  <div class="pill" id="cam-btn">CHASE CAM</div>
+  <div class="pill" id="vol-btn">SFX ON</div>
+</div>
+
+<div id="panel">
+  <div id="connect-screen">
+    <h2>CONNECT YOUR MUSIC</h2>
+    <p>Link Spotify to sync the world with your<br>playlist's BPM, energy, and mood.<br>Requires Spotify Premium.</p>
+    <button id="sp-btn">CONNECT SPOTIFY</button>
+    <button id="demo-btn">DRIVE IN DEMO MODE</button>
+  </div>
+  <div id="now-playing">
+    <img id="art" src="" alt="">
+    <div id="tinfo">
+      <div id="tname">---</div>
+      <div id="tartist">---</div>
+      <div id="prog"><div id="prog-fill"></div></div>
+      <div class="ctrls">
+        <button class="cb" id="prev-btn">⏮</button>
+        <button class="cb" id="play-btn">⏸</button>
+        <button class="cb" id="next-btn">⏭</button>
+        <span id="ttime">0:00</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="fhint">PRESS F TO EXIT FOCUS</div>
+
+<!-- Three.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+// ════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════
+const S = {
+  started: false,
+  speed: 0, targetSpeed: 120,
+  bpm: 120, beatPulse: 0, energy: 0.5,
+  rain: false, focusMode: false,
+  camMode: 0,          // 0=chase 1=low 2=hood
+  sfxOn: true,
+  time: 0,
+  engineRunning: false
+};
+
+// ════════════════════════════════════════════
+//  CURSOR
+// ════════════════════════════════════════════
+const cur = document.getElementById('cur');
+document.addEventListener('mousemove', e => {
+  cur.style.left = e.clientX + 'px';
+  cur.style.top = e.clientY + 'px';
+});
+
+// ════════════════════════════════════════════
+//  CLOCK + VHS TIMER
+// ════════════════════════════════════════════
+let vhsSec = 0;
+function updateClock() {
+  const n = new Date();
+  document.getElementById('clock').textContent =
+    String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0');
+}
+updateClock(); setInterval(updateClock, 15000);
+setInterval(() => {
+  vhsSec++;
+  const h = String(Math.floor(vhsSec/3600)).padStart(2,'0');
+  const m = String(Math.floor((vhsSec%3600)/60)).padStart(2,'0');
+  const s = String(vhsSec%60).padStart(2,'0');
+  document.getElementById('vhs').textContent = 'REC ● ' + h + ':' + m + ':' + s;
+}, 1000);
+
+// ════════════════════════════════════════════
+//  WEB AUDIO — ENGINE + AMBIENCE
+// ════════════════════════════════════════════
+let audioCtx = null, engineOsc = null, engineGain = null, rumbleOsc = null, rumbleGain = null;
+let rainBuffer = null, rainSource = null, rainGainNode = null;
+
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+  // Engine — two detuned sawtooth oscillators
+  engineGain = audioCtx.createGain();
+  engineGain.gain.value = 0;
+  engineGain.connect(audioCtx.destination);
+
+  engineOsc = audioCtx.createOscillator();
+  engineOsc.type = 'sawtooth';
+  engineOsc.frequency.value = 55;
+  const f1 = audioCtx.createBiquadFilter();
+  f1.type = 'lowpass'; f1.frequency.value = 400;
+  engineOsc.connect(f1); f1.connect(engineGain);
+  engineOsc.start();
+
+  rumbleOsc = audioCtx.createOscillator();
+  rumbleOsc.type = 'sawtooth';
+  rumbleOsc.frequency.value = 58; // slight detune for richness
+  rumbleGain = audioCtx.createGain();
+  rumbleGain.gain.value = 0;
+  const f2 = audioCtx.createBiquadFilter();
+  f2.type = 'lowpass'; f2.frequency.value = 300;
+  rumbleOsc.connect(f2); f2.connect(rumbleGain); rumbleGain.connect(audioCtx.destination);
+  rumbleOsc.start();
+
+  // Rain noise
+  const bufSize = audioCtx.sampleRate * 2;
+  rainBuffer = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+  const data = rainBuffer.getChannelData(0);
+  for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+
+  rainGainNode = audioCtx.createGain();
+  rainGainNode.gain.value = 0;
+  const rainFilter = audioCtx.createBiquadFilter();
+  rainFilter.type = 'bandpass'; rainFilter.frequency.value = 2000; rainFilter.Q.value = 0.5;
+  rainGainNode.connect(rainFilter); rainFilter.connect(audioCtx.destination);
+
+  S.engineRunning = true;
+}
+
+function startEngine() {
+  if (!audioCtx || !S.sfxOn) return;
+  engineGain.gain.setTargetAtTime(0.08, audioCtx.currentTime, 1.5);
+  rumbleGain.gain.setTargetAtTime(0.05, audioCtx.currentTime, 1.5);
+}
+
+function updateEngineSound(speedKmh) {
+  if (!audioCtx || !S.sfxOn || !S.engineRunning) return;
+  // Pitch scales with speed
+  const baseFreq = 45 + (speedKmh / 200) * 80;
+  engineOsc.frequency.setTargetAtTime(baseFreq, audioCtx.currentTime, 0.3);
+  rumbleOsc.frequency.setTargetAtTime(baseFreq * 1.04, audioCtx.currentTime, 0.3);
+  const vol = 0.04 + (speedKmh / 200) * 0.06;
+  engineGain.gain.setTargetAtTime(vol, audioCtx.currentTime, 0.4);
+  rumbleGain.gain.setTargetAtTime(vol * 0.6, audioCtx.currentTime, 0.4);
+}
+
+function setRainSound(on) {
+  if (!audioCtx) return;
+  if (on) {
+    if (!rainSource) {
+      rainSource = audioCtx.createBufferSource();
+      rainSource.buffer = rainBuffer;
+      rainSource.loop = true;
+      rainSource.connect(rainGainNode);
+      rainSource.start();
+    }
+    rainGainNode.gain.setTargetAtTime(S.sfxOn ? 0.18 : 0, audioCtx.currentTime, 0.5);
+  } else {
+    rainGainNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.5);
+  }
+}
+
+function toggleSFX(on) {
+  S.sfxOn = on;
+  if (!audioCtx) return;
+  if (!on) {
+    engineGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.3);
+    rumbleGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.3);
+    rainGainNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.3);
+  } else {
+    updateEngineSound(S.speed);
+    if (S.rain) setRainSound(true);
+  }
+}
+
+// ════════════════════════════════════════════
+//  THREE.JS SCENE
+// ════════════════════════════════════════════
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('c'), antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.88;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x000008);
+scene.fog = new THREE.FogExp2(0x000312, 0.019);
+
+const camera = new THREE.PerspectiveCamera(64, window.innerWidth / window.innerHeight, 0.1, 280);
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  bloomCanvas.width = window.innerWidth;
+  bloomCanvas.height = window.innerHeight;
+});
+
+// LIGHTS
+scene.add(new THREE.AmbientLight(0x000614, 1.2));
+const moon = new THREE.DirectionalLight(0x0011aa, 0.35);
+moon.position.set(-10, 25, 8); scene.add(moon);
+
+// ─── ROAD ────────────────────────────────────
+const RW = 10, RL = 120;
+const roadMat = new THREE.MeshStandardMaterial({ color: 0x070710, roughness: 0.22, metalness: 0.18 });
+const road = new THREE.Mesh(new THREE.PlaneGeometry(RW, RL, 1, 80), roadMat);
+road.rotation.x = -Math.PI / 2;
+scene.add(road);
+
+// Shoulders
+[-6, 6].forEach(x => {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(2.5, RL),
+    new THREE.MeshStandardMaterial({ color: 0x050508, roughness: 0.95 }));
+  m.rotation.x = -Math.PI / 2; m.position.set(x, -0.001, 0);
+  scene.add(m);
+});
+
+// Wet reflection (rain mode)
+const reflMat = new THREE.MeshStandardMaterial({
+  color: 0x000014, roughness: 0.02, metalness: 1.0, opacity: 0, transparent: true
+});
+const reflPlane = new THREE.Mesh(new THREE.PlaneGeometry(RW, RL), reflMat);
+reflPlane.rotation.x = -Math.PI / 2; reflPlane.position.y = 0.001;
+scene.add(reflPlane);
+
+// Lane dashes
+const dashMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+const dashes = [];
+for (let i = -10; i <= 10; i++) {
+  const d = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 4), dashMat);
+  d.rotation.x = -Math.PI / 2; d.position.set(0, 0.003, i * 10);
+  scene.add(d); dashes.push(d);
+}
+
+// Side white lines
+[-4.5, 4.5].forEach(x => {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(0.13, RL),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, opacity: 0.7, transparent: true }));
+  m.rotation.x = -Math.PI / 2; m.position.set(x, 0.003, 0);
+  scene.add(m);
+});
+
+// Yellow center double lines
+[-0.18, 0.18].forEach(x => {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(0.1, RL),
+    new THREE.MeshBasicMaterial({ color: 0xffcc00, opacity: 0.5, transparent: true }));
+  m.rotation.x = -Math.PI / 2; m.position.set(x, 0.002, 0);
+  scene.add(m);
+});
+
+// ─── CAR (AE86-style hatchback) ───────────────
+const car = new THREE.Group();
+
+function toon(hex) { return new THREE.MeshToonMaterial({ color: hex }); }
+
+// Body
+const body = new THREE.Mesh(new THREE.BoxGeometry(1.82, 0.6, 4.4), toon(0x0c0c18));
+body.position.y = 0.46; car.add(body);
+
+// Cabin/roof
+const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.52, 0.54, 2.05), toon(0x090912));
+cabin.position.set(0, 0.99, -0.22); car.add(cabin);
+
+// Windshield
+const wsMat = new THREE.MeshToonMaterial({ color: 0x00052f, opacity: 0.6, transparent: true });
+const ws = new THREE.Mesh(new THREE.BoxGeometry(1.47, 0.44, 0.06), wsMat);
+ws.position.set(0, 0.97, 0.82); ws.rotation.x = 0.3; car.add(ws);
+
+// Rear window
+const rw = new THREE.Mesh(new THREE.BoxGeometry(1.47, 0.4, 0.06), wsMat);
+rw.position.set(0, 0.95, -1.25); rw.rotation.x = -0.28; car.add(rw);
+
+// Hood
+const hood = new THREE.Mesh(new THREE.BoxGeometry(1.82, 0.06, 1.2), toon(0x0d0d1a));
+hood.position.set(0, 0.76, 1.6); hood.rotation.x = 0.08; car.add(hood);
+
+// Spoiler
+const spoiler = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.06, 0.28), toon(0x080812));
+spoiler.position.set(0, 1.25, -2.1); car.add(spoiler);
+[-0.8, 0.8].forEach(x => {
+  const s = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.28, 0.1), toon(0x080812));
+  s.position.set(x, 1.12, -2.1); car.add(s);
+});
+
+// Wheels
+const wGeo = new THREE.CylinderGeometry(0.32, 0.32, 0.22, 16);
+const wMat = toon(0x040406);
+const hGeo = new THREE.CylinderGeometry(0.18, 0.18, 0.24, 8);
+const hMat = toon(0x1a1a28);
+const spGeo = new THREE.BoxGeometry(0.04, 0.26, 0.04);
+const spMat = toon(0x2a2a3a);
+const wheels = [];
+[[-1, 1.5], [1, 1.5], [-1, -1.5], [1, -1.5]].forEach(([x, z]) => {
+  const w = new THREE.Mesh(wGeo, wMat); w.rotation.z = Math.PI / 2;
+  w.position.set(x, 0.32, z); car.add(w);
+  const h = new THREE.Mesh(hGeo, hMat); h.rotation.z = Math.PI / 2;
+  h.position.set(x, 0.32, z); car.add(h);
+  // Spokes
+  for (let i = 0; i < 5; i++) {
+    const sp = new THREE.Mesh(spGeo, spMat);
+    sp.rotation.z = (i / 5) * Math.PI * 2;
+    sp.position.set(x, 0.32, z); car.add(sp);
+  }
+  wheels.push(w);
+});
+
+// ── TAILLIGHTS ── The SIGNATURE element
+const tailLights = [];
+[-0.64, 0.64].forEach(x => {
+  // Housing
+  const housing = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.17, 0.04), toon(0x1a0005));
+  housing.position.set(x, 0.5, -2.22); car.add(housing);
+  // Bright center
+  const bright = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.08, 0.04),
+    new THREE.MeshBasicMaterial({ color: 0xff2233 }));
+  bright.position.set(x, 0.5, -2.23); car.add(bright);
+  // Outer glow mesh
+  const glow = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.25, 0.02),
+    new THREE.MeshBasicMaterial({ color: 0xff1122, transparent: true, opacity: 0.3 }));
+  glow.position.set(x, 0.5, -2.24); car.add(glow);
+  // Point light
+  const pl = new THREE.PointLight(0xff1122, 4, 6);
+  pl.position.set(x, 0.5, -2.25); car.add(pl);
+  tailLights.push({ pl, glow });
+});
+
+// Headlights
+[-0.55, 0.55].forEach(x => {
+  const lm = new THREE.MeshBasicMaterial({ color: 0xddeeff });
+  const l = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.13, 0.04), lm);
+  l.position.set(x, 0.5, 2.23); car.add(l);
+  const sl = new THREE.SpotLight(0x8899ff, 6, 40, Math.PI / 10, 0.55);
+  sl.position.set(x, 0.65, 2.3);
+  sl.target.position.set(x * 0.4, -2, 22);
+  car.add(sl); car.add(sl.target);
+});
+
+// Exhaust pipe
+const ex = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.4, 8), toon(0x1a1a22));
+ex.rotation.x = Math.PI / 2; ex.position.set(0.5, 0.22, -2.25); car.add(ex);
+
+car.position.set(0, 0, -3);
+scene.add(car);
+
+// ─── STREETLIGHTS ─────────────────────────────
+const LS = 22, LC = 8;
+const slights = [];
+
+function mkSL(z, side) {
+  const g = new THREE.Group();
+  const pMat = toon(0x0f0f1e);
+
+  // Pole
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.09, 6.5, 7), pMat);
+  pole.position.y = 3.25; g.add(pole);
+
+  // Arm
+  const arm = new THREE.Mesh(new THREE.BoxGeometry(side * 2.8, 0.08, 0.08), pMat);
+  arm.position.set(side * 1.4, 6.2, 0); g.add(arm);
+
+  // Lamp housing
+  const lampH = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.24, 0.6), toon(0x181828));
+  lampH.position.set(side * 2.8, 6.08, 0); g.add(lampH);
+
+  // Glow plate
+  const glowMesh = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.05, 0.5),
+    new THREE.MeshBasicMaterial({ color: 0xffaa22 }));
+  glowMesh.position.set(side * 2.8, 5.96, 0); g.add(glowMesh);
+
+  // Downward cone of light
+  const pl = new THREE.PointLight(0xff8800, 0, 20);
+  pl.position.set(side * 2.8, 5.9, 0); g.add(pl);
+
+  g.position.set(side * 6.2, 0, z);
+  scene.add(g);
+  return { group: g, light: pl, glow: glowMesh, baseZ: z };
+}
+
+for (let i = 0; i < LC; i++) {
+  const z = -RL / 2 + i * LS;
+  slights.push(mkSL(z, -1));
+  slights.push(mkSL(z, 1));
+}
+
+// ─── TREES (silhouettes) ────────────────────────
+const treeMat = toon(0x02020a);
+const trunkMat2 = toon(0x010105);
+const treeGrp = [];
+
+function mkTree(x, z, h) {
+  const g = new THREE.Group();
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.14, h*0.32, 5), trunkMat2);
+  trunk.position.y = h * 0.16; g.add(trunk);
+  [0, 1, 2].forEach(i => {
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(h*0.24 - i*0.09, h*0.4, 6), treeMat);
+    cone.position.y = h * 0.3 + i * h * 0.24; g.add(cone);
+  });
+  g.position.set(x, 0, z);
+  scene.add(g); treeGrp.push(g);
+}
+for (let i = 0; i < 20; i++) {
+  const z = -RL / 2 + i * 11 + Math.random() * 4;
+  const h = 2.8 + Math.random() * 2.5;
+  mkTree(-(8 + Math.random()*3.5), z, h);
+  mkTree(8 + Math.random()*3.5, z, h);
+}
+
+// ─── GUARDRAILS ────────────────────────────────
+const grMat2 = toon(0x0e0e1c);
+[-5.2, 5.2].forEach(x => {
+  const r = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.45, RL), grMat2);
+  r.position.set(x, 0.4, 0); scene.add(r);
+  // Posts
+  for (let i = -RL/2; i < RL/2; i += 6) {
+    const p = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.6, 0.08), grMat2);
+    p.position.set(x, 0.3, i); scene.add(p);
+  }
+});
+
+// ─── DISTANT CITY ──────────────────────────────
+const cityBg = new THREE.Mesh(
+  new THREE.PlaneGeometry(120, 18),
+  new THREE.MeshBasicMaterial({ color: 0x000a1a, transparent: true, opacity: 0.6 })
+);
+cityBg.position.set(0, 7, -RL / 2 - 1);
+scene.add(cityBg);
+
+// Buildings + neon glow windows
+const neonColors = [0xff3366, 0x0044ff, 0x00ffcc, 0xffaa00, 0xff00ff];
+for (let i = 0; i < 60; i++) {
+  const w = 0.3 + Math.random() * 2;
+  const h = 1.5 + Math.random() * 8;
+  const isLit = Math.random() > 0.45;
+  const col = isLit ? neonColors[Math.floor(Math.random() * neonColors.length)] : 0x030312;
+  const bMat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: isLit ? 0.18 + Math.random()*0.35 : 0.85 });
+  const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.4), bMat);
+  b.position.set(-55 + Math.random()*110, h/2, -RL/2 - 0.5 + Math.random()*1.5);
+  scene.add(b);
+}
+
+// Neon billboard sign
+const signMat = new THREE.MeshBasicMaterial({ color: 0x00ffcc, transparent: true, opacity: 0.35 });
+const sign = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.8), signMat);
+sign.position.set(-12, 7, -RL/2 + 2);
+scene.add(sign);
+const signLight = new THREE.PointLight(0x00ffcc, 0.8, 12);
+signLight.position.copy(sign.position);
+scene.add(signLight);
+
+// ─── STARS ─────────────────────────────────────
+const sPos = [];
+for (let i = 0; i < 2500; i++)
+  sPos.push((Math.random()-.5)*400, 12+Math.random()*140, (Math.random()-.5)*400);
+const sGeo = new THREE.BufferGeometry();
+sGeo.setAttribute('position', new THREE.Float32BufferAttribute(sPos, 3));
+scene.add(new THREE.Points(sGeo,
+  new THREE.PointsMaterial({ color: 0xffffff, size: 0.13, transparent: true, opacity: 0.5 })));
+
+// ════════════════════════════════════════════
+//  BLOOM (canvas-based post-process approximation)
+// ════════════════════════════════════════════
+const bloomCanvas = document.getElementById('bloom-canvas');
+const bctx = bloomCanvas.getContext('2d');
+bloomCanvas.width = window.innerWidth;
+bloomCanvas.height = window.innerHeight;
+
+function drawBloom() {
+  // Extract bright spots from Three.js canvas and apply blur for bloom
+  bctx.clearRect(0, 0, bloomCanvas.width, bloomCanvas.height);
+  bctx.drawImage(renderer.domElement, 0, 0, bloomCanvas.width, bloomCanvas.height);
+  bctx.filter = 'blur(12px) brightness(1.5)';
+  bctx.drawImage(renderer.domElement, 0, 0, bloomCanvas.width, bloomCanvas.height);
+  bctx.filter = 'blur(24px) brightness(1.2)';
+  bctx.drawImage(renderer.domElement, 0, 0, bloomCanvas.width, bloomCanvas.height);
+  bctx.filter = 'none';
+}
+
+// ════════════════════════════════════════════
+//  RAIN SYSTEM
+// ════════════════════════════════════════════
+const rainC = document.getElementById('rain-c');
+const rctx = rainC.getContext('2d');
+let rainDrops = [], rainId = null;
+
+function initRain() {
+  rainC.width = window.innerWidth; rainC.height = window.innerHeight;
+  rainDrops = Array.from({ length: 220 }, () => ({
+    x: Math.random() * rainC.width,
+    y: Math.random() * rainC.height,
+    len: 10 + Math.random() * 25,
+    spd: 8 + Math.random() * 10,
+    op: 0.07 + Math.random() * 0.2
+  }));
+  function frame() {
+    rctx.clearRect(0, 0, rainC.width, rainC.height);
+    rainDrops.forEach(d => {
+      rctx.beginPath();
+      rctx.moveTo(d.x, d.y);
+      rctx.lineTo(d.x + d.len * 0.1, d.y + d.len);
+      rctx.strokeStyle = `rgba(130,165,255,${d.op})`;
+      rctx.lineWidth = 0.8; rctx.stroke();
+      d.y += d.spd; d.x += d.spd * 0.08;
+      if (d.y > rainC.height) { d.y = -d.len; d.x = Math.random() * rainC.width; }
+    });
+    rainId = requestAnimationFrame(frame);
+  }
+  frame();
+}
+
+function toggleRain(on) {
+  S.rain = on;
+  rainC.style.opacity = on ? '0.75' : '0';
+  scene.fog.color.set(on ? 0x00060f : 0x000312);
+  reflMat.opacity = on ? 0.65 : 0;
+  if (on) { initRain(); setRainSound(true); }
+  else {
+    if (rainId) { cancelAnimationFrame(rainId); rainId = null; }
+    setRainSound(false);
+  }
+}
+
+// ════════════════════════════════════════════
+//  BPM ENGINE
+// ════════════════════════════════════════════
+let beatIv = null;
+function setBPM(bpm) {
+  S.bpm = Math.max(60, Math.min(200, bpm));
+  document.getElementById('bpm-disp').textContent = 'BPM: ' + Math.round(S.bpm);
+  if (beatIv) clearInterval(beatIv);
+  beatIv = setInterval(() => { S.beatPulse = 1.0; }, 60000 / S.bpm);
+}
+setBPM(120);
+
+// ════════════════════════════════════════════
+//  CAMERA MODES
+// ════════════════════════════════════════════
+const camCfg = [
+  { p: new THREE.Vector3(0, 2.7, 9),   t: new THREE.Vector3(0, 0.7, 0) },
+  { p: new THREE.Vector3(0.7, 0.85, 6.2), t: new THREE.Vector3(0, 0.5, -12) },
+  { p: new THREE.Vector3(0, 1.3, 1.9),  t: new THREE.Vector3(0, 1.1, -35) },
+];
+const camLabels = ['CHASE CAM', 'LOW CAM', 'HOOD CAM'];
+
+// ════════════════════════════════════════════
+//  RENDER LOOP
+// ════════════════════════════════════════════
+const clock3 = new THREE.Clock();
+let spdDisplay = 0, swayT = 0, bloomTick = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock3.getDelta(), 0.05);
+  S.time += dt;
+
+  renderer.render(scene, camera);
+
+  // Bloom every 2 frames for performance
+  bloomTick++;
+  if (bloomTick % 2 === 0) drawBloom();
+
+  if (!S.started) return;
+
+  // Speed ramp
+  S.speed += (S.targetSpeed - S.speed) * dt * 0.55;
+  spdDisplay += (S.speed - spdDisplay) * dt * 5;
+  document.getElementById('spd').textContent = String(Math.round(spdDisplay)).padStart(3, '0');
+
+  // Engine sound update
+  updateEngineSound(S.speed);
+
+  // Beat pulse decay
+  S.beatPulse *= 0.88;
+
+  // Taillight beat + energy glow
+  tailLights.forEach(({ pl, glow }) => {
+    pl.intensity = 3.5 + S.beatPulse * 6 + S.energy * 2;
+    pl.distance = 5 + S.energy * 2;
+    glow.material.opacity = 0.2 + S.beatPulse * 0.5;
+  });
+
+  // Streetlight proximity fade + beat pulse
+  slights.forEach(sl => {
+    const dist = Math.abs(sl.group.position.z - 5);
+    const prox = Math.max(0, 1 - dist / 25);
+    sl.light.intensity = (2 + S.beatPulse * 3.5) * prox;
+    const sc = 1 + S.beatPulse * 0.25;
+    sl.glow.scale.set(sc, sc, 1);
+  });
+
+  // Sign pulse
+  signLight.intensity = 0.6 + Math.sin(S.time * 1.5) * 0.3 + S.beatPulse * 0.8;
+
+  // Camera sway / float
+  swayT += dt;
+  const cp = camCfg[S.camMode];
+  const sx = Math.sin(swayT * 0.28) * (0.014 + S.beatPulse * 0.007);
+  const sy = Math.sin(swayT * 0.47) * 0.008 + Math.sin(swayT * 1.1) * 0.003;
+  camera.position.lerp(new THREE.Vector3(cp.p.x + sx, cp.p.y + sy, cp.p.z), dt * 3.5);
+  camera.lookAt(cp.t.x + sx * 0.3, cp.t.y, cp.t.z);
+
+  // Wheel spin
+  const spinRate = S.speed / 60;
+  wheels.forEach(w => { w.rotation.x += spinRate * dt; });
+
+  // Car micro-bob
+  car.position.y = Math.sin(S.time * 8.5) * 0.006 + Math.sin(S.time * 3.7) * 0.003;
+
+  // Environment scroll
+  const move = S.speed / 3600 * dt * 1000;
+
+  dashes.forEach(d => {
+    d.position.z += move;
+    if (d.position.z > 15) d.position.z -= 21 * Math.ceil(dashes.length / 2);
+    if (d.position.z < -RL) d.position.z += 21 * Math.ceil(dashes.length / 2);
+  });
+
+  slights.forEach(sl => {
+    sl.group.position.z += move;
+    if (sl.group.position.z > 14) sl.group.position.z -= LS * LC;
+    if (sl.group.position.z < -RL + 6) sl.group.position.z += LS * LC;
+  });
+
+  treeGrp.forEach(t => {
+    t.position.z += move;
+    if (t.position.z > 14) t.position.z -= 220;
+    if (t.position.z < -210) t.position.z += 220;
+  });
+}
+animate();
+
+// ════════════════════════════════════════════
+//  INTRO + ENGINE START
+// ════════════════════════════════════════════
+document.getElementById('ign-btn').addEventListener('click', () => {
+  // Init audio on user gesture
+  initAudio();
+  setTimeout(() => startEngine(), 300);
+
+  document.getElementById('intro').classList.add('fade');
+  setTimeout(() => document.getElementById('intro').style.display = 'none', 1900);
+
+  S.started = true;
+  S.targetSpeed = 0;
+  // Gradual acceleration — feels like real ignition
+  setTimeout(() => { S.targetSpeed = 40; }, 800);
+  setTimeout(() => { S.targetSpeed = 80; }, 2500);
+  setTimeout(() => { S.targetSpeed = 120; }, 4500);
+});
+
+// ════════════════════════════════════════════
+//  UI CONTROLS
+// ════════════════════════════════════════════
+document.getElementById('rain-btn').addEventListener('click', function() {
+  if (!audioCtx) initAudio();
+  toggleRain(!S.rain);
+  this.classList.toggle('on', S.rain);
+  this.textContent = S.rain ? 'RAIN ●' : 'RAIN';
+});
+
+document.getElementById('focus-btn').addEventListener('click', function() {
+  S.focusMode = !S.focusMode;
+  this.classList.toggle('on', S.focusMode);
+  ['panel','hud'].forEach(id => document.getElementById(id).classList.toggle('hidden', S.focusMode));
+  document.getElementById('ctrl-panel').classList.toggle('hidden', S.focusMode);
+  document.getElementById('topbar').style.opacity = S.focusMode ? '0' : '1';
+  document.getElementById('vhs').style.opacity = S.focusMode ? '0' : '0.15';
+  document.getElementById('fhint').style.opacity = S.focusMode ? '0.4' : '0';
+});
+
+document.getElementById('cam-btn').addEventListener('click', function() {
+  S.camMode = (S.camMode + 1) % 3;
+  this.textContent = camLabels[S.camMode];
+});
+
+document.getElementById('vol-btn').addEventListener('click', function() {
+  if (!audioCtx) initAudio();
+  S.sfxOn = !S.sfxOn;
+  toggleSFX(S.sfxOn);
+  this.classList.toggle('on', !S.sfxOn);
+  this.textContent = S.sfxOn ? 'SFX ON' : 'SFX OFF';
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (k === 'f') document.getElementById('focus-btn').click();
+  if (k === 'r') document.getElementById('rain-btn').click();
+  if (k === 'c') document.getElementById('cam-btn').click();
+  if (k === 'm') document.getElementById('vol-btn').click();
+});
+
+// ════════════════════════════════════════════
+//  DEMO MODE
+// ════════════════════════════════════════════
+document.getElementById('demo-btn').addEventListener('click', startDemo);
+
+const demoTracks = [
+  { name: 'City After Rain', artist: 'Nujabes Style',     bpm: 88,  energy: 0.38, hue: 220 },
+  { name: 'Midnight Drive',  artist: 'Lo-Fi Collective',  bpm: 96,  energy: 0.50, hue: 260 },
+  { name: 'Neon Highway',    artist: 'Synthwave FM',       bpm: 118, energy: 0.74, hue: 340 },
+  { name: 'Late Night Tokyo',artist: 'City Pop Archives',  bpm: 108, energy: 0.62, hue: 200 },
+  { name: 'Empty Streets',   artist: 'Ambient Highway',    bpm: 80,  energy: 0.32, hue: 180 },
+];
+
+let demoIv = null, progIv = null;
+
+function startDemo() {
+  document.getElementById('connect-screen').style.display = 'none';
+  document.getElementById('now-playing').classList.add('active');
+  let ti = 0, prog = 0;
+
+  function loadTrack(i) {
+    const t = demoTracks[i];
+    document.getElementById('tname').textContent = t.name;
+    document.getElementById('tartist').textContent = t.artist;
+    document.getElementById('art').style.background =
+      `linear-gradient(135deg, hsl(${t.hue},60%,6%), hsl(${t.hue+40},80%,4%))`;
+    setBPM(t.bpm);
+    S.energy = t.energy;
+    S.targetSpeed = 65 + t.energy * 80;
+    prog = 0;
+  }
+
+  loadTrack(0);
+  if (progIv) clearInterval(progIv);
+  progIv = setInterval(() => {
+    prog = Math.min(100, prog + 0.35);
+    document.getElementById('prog-fill').style.width = prog + '%';
+    const sec = Math.round(prog / 100 * 220);
+    document.getElementById('ttime').textContent = Math.floor(sec/60) + ':' + String(sec%60).padStart(2,'0');
+    if (prog >= 100) { ti = (ti + 1) % demoTracks.length; loadTrack(ti); }
+  }, 500);
+}
+
+// ════════════════════════════════════════════
+//  SPOTIFY INTEGRATION
+// ════════════════════════════════════════════
+// 1. Register at https://developer.spotify.com/dashboard
+// 2. Add your redirect URI (this page's URL)
+// 3. Replace CLIENT_ID below
+const SPOTIFY_CLIENT_ID = 'YOUR_SPOTIFY_CLIENT_ID';
+const REDIRECT_URI = window.location.href.split('?')[0].split('#')[0];
+const SCOPES = [
+  'streaming', 'user-read-email', 'user-read-private',
+  'user-read-playback-state', 'user-modify-playback-state'
+].join(' ');
+
+document.getElementById('sp-btn').addEventListener('click', () => {
+  if (SPOTIFY_CLIENT_ID === 'YOUR_SPOTIFY_CLIENT_ID') {
+    alert('To use Spotify:\n1. Go to developer.spotify.com/dashboard\n2. Create an app\n3. Add your Client ID to the code\n\nStarting Demo Mode instead...');
+    startDemo(); return;
+  }
+  window.location.href =
+    `https://accounts.spotify.com/authorize?response_type=token&client_id=${SPOTIFY_CLIENT_ID}` +
+    `&scope=${encodeURIComponent(SCOPES)}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
+});
+
+// Handle Spotify token redirect
+const hashParams = new URLSearchParams(window.location.hash.substring(1));
+const spotToken = hashParams.get('access_token');
+if (spotToken) {
+  window.history.pushState({}, '', window.location.pathname);
+  initSpotify(spotToken);
+}
+
+async function initSpotify(tok) {
+  document.getElementById('connect-screen').style.display = 'none';
+  document.getElementById('now-playing').classList.add('active');
+
+  let currentTrackId = null;
+
+  async function poll() {
+    try {
+      const r = await fetch('https://api.spotify.com/v1/me/player', {
+        headers: { Authorization: 'Bearer ' + tok }
+      });
+      if (r.status === 200) {
+        const d = await r.json();
+        if (d?.item) {
+          document.getElementById('tname').textContent = d.item.name;
+          document.getElementById('tartist').textContent = d.item.artists.map(a => a.name).join(', ');
+          if (d.item.album?.images?.[0])
+            document.getElementById('art').src = d.item.album.images[0].url;
+
+          const pct = (d.progress_ms / d.item.duration_ms) * 100;
+          document.getElementById('prog-fill').style.width = pct + '%';
+          const s = Math.floor(d.progress_ms / 1000);
+          document.getElementById('ttime').textContent = Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
+
+          // Fetch audio features if track changed
+          if (d.item.id !== currentTrackId) {
+            currentTrackId = d.item.id;
+            fetchFeatures(tok, d.item.id);
+          }
+        }
+      }
+    } catch(e) {}
+    setTimeout(poll, 3500);
+  }
+  poll();
+
+  // Playback controls
+  async function sp(ep, method = 'POST') {
+    await fetch(`https://api.spotify.com/v1/me/player/${ep}`, {
+      method, headers: { Authorization: 'Bearer ' + tok }
+    });
+  }
+
+  document.getElementById('play-btn').addEventListener('click', async function() {
+    try {
+      const r = await fetch('https://api.spotify.com/v1/me/player', {
+        headers: { Authorization: 'Bearer ' + tok }
+      });
+      const d = await r.json();
+      if (d.is_playing) { sp('pause'); this.textContent = '▶'; S.targetSpeed = 0; }
+      else              { sp('play');  this.textContent = '⏸'; S.targetSpeed = 120; }
+    } catch(e) {}
+  });
+
+  document.getElementById('next-btn').addEventListener('click', () => sp('next'));
+  document.getElementById('prev-btn').addEventListener('click', () => sp('previous'));
+}
+
+async function fetchFeatures(tok, id) {
+  try {
+    const r = await fetch(`https://api.spotify.com/v1/audio-features/${id}`, {
+      headers: { Authorization: 'Bearer ' + tok }
+    });
+    if (r.ok) {
+      const d = await r.json();
+      setBPM(d.tempo);
+      S.energy = d.energy;
+      S.targetSpeed = 65 + d.energy * 85;
+    }
+  } catch(e) {}
+}
+</script>
+</body>
+</html>
