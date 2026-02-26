@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Deep Code</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Outfit:wght@200;300;400;500;600;700;800&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --accent-cyan: #00e5ff;
+    --accent-green: #39ff14;
+    --accent-purple: #b388ff;
+    --accent-orange: #ff6d00;
+    --accent-pink: #ff4081;
+    --text-light: #f0f4f8;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Outfit', sans-serif;
+    overflow-x: hidden;
+    background: #000;
+  }
+
+  /* ===== HERO ===== */
+  .hero {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(180deg, #c8e6f0 0%, #a8d8ea 50%, #7ec8d8 100%);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 600px 200px at 50% 20%, rgba(255,255,255,0.6), transparent),
+      radial-gradient(ellipse 400px 400px at 30% 60%, rgba(173, 216, 230, 0.3), transparent);
+    pointer-events: none;
+  }
+
+  .hero-title {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(3rem, 8vw, 7rem);
+    font-weight: 800;
+    color: #1a3a4a;
+    letter-spacing: -0.03em;
+    text-align: center;
+    position: relative;
+    z-index: 2;
+  }
+
+  .hero-title span {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: clamp(0.9rem, 2.2vw, 1.4rem);
+    font-weight: 300;
+    color: #3a6a7a;
+    letter-spacing: 0.15em;
+    margin-top: 0.5rem;
+    text-transform: uppercase;
+  }
+
+  .scroll-prompt {
+    position: absolute;
+    bottom: 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    z-index: 2;
+    animation: bob 2s ease-in-out infinite;
+  }
+
+  .scroll-prompt p {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    color: #3a6a7a;
+    letter-spacing: 0.1em;
+  }
+
+  .scroll-arrow {
+    width: 24px; height: 24px;
+    border-right: 2px solid #3a6a7a;
+    border-bottom: 2px solid #3a6a7a;
+    transform: rotate(45deg);
+  }
+
+  @keyframes bob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(10px); }
+  }
+
+  /* ===== DEPTH METER ===== */
+  .depth-meter {
+    position: fixed;
+    right: 24px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.5s;
+    pointer-events: none;
+  }
+
+  .depth-meter.visible { opacity: 1; }
+
+  .depth-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: rgba(255,255,255,0.4);
+    letter-spacing: 0.08em;
+  }
+
+  .depth-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: rgba(255,255,255,0.85);
+    text-shadow: 0 0 20px rgba(0,229,255,0.3);
+  }
+
+  .depth-unit {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6rem;
+    color: rgba(255,255,255,0.3);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* ===== PARTICLES ===== */
+  .particles-container {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    overflow: hidden;
+  }
+
+  .particle {
+    position: absolute;
+    font-family: 'JetBrains Mono', monospace;
+    opacity: 0;
+    animation: drift linear infinite;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  @keyframes drift {
+    0% { transform: translateY(0) translateX(0); }
+    25% { transform: translateY(-12px) translateX(8px); }
+    50% { transform: translateY(-4px) translateX(-6px); }
+    75% { transform: translateY(-16px) translateX(4px); }
+    100% { transform: translateY(0) translateX(0); }
+  }
+
+  /* ===== LAYOUT ===== */
+  .deep-scroll { position: relative; width: 100%; }
+
+  .layer {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+  }
+
+  .layer-content {
+    position: relative;
+    z-index: 2;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* ===== ZONE MARKERS ===== */
+  .zone-marker {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 90px 0 60px;
+    opacity: 0;
+    transform: translateY(30px);
+    transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .zone-marker.visible { opacity: 1; transform: translateY(0); }
+
+  .zone-line { flex: 1; height: 1px; opacity: 0.25; }
+
+  .zone-name {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(1.2rem, 3vw, 2rem);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .zone-depth {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    opacity: 0.5;
+  }
+
+  /* ===== ITEMS ===== */
+  .item {
+    display: flex;
+    align-items: center;
+    gap: clamp(20px, 4vw, 44px);
+    padding: 48px 0;
+    opacity: 0;
+    transform: translateX(-40px);
+    transition: all 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .item.from-right {
+    flex-direction: row-reverse;
+    transform: translateX(40px);
+    text-align: right;
+  }
+
+  .item.visible { opacity: 1; transform: translateX(0); }
+
+  .item-icon {
+    flex-shrink: 0;
+    width: clamp(64px, 12vw, 100px);
+    height: clamp(64px, 12vw, 100px);
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .item-icon img {
+    width: 55%;
+    height: 55%;
+    object-fit: contain;
+    filter: drop-shadow(0 2px 8px rgba(0,0,0,0.2));
+    position: relative;
+    z-index: 1;
+  }
+
+  .item-icon svg {
+    width: 50%;
+    height: 50%;
+    position: relative;
+    z-index: 1;
+  }
+
+  .item-name {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(1.1rem, 2.5vw, 1.55rem);
+    font-weight: 700;
+    margin-bottom: 6px;
+    line-height: 1.25;
+  }
+
+  .item-fact {
+    font-family: 'Outfit', sans-serif;
+    font-size: clamp(0.85rem, 1.7vw, 1rem);
+    line-height: 1.7;
+    font-weight: 300;
+    opacity: 0.72;
+    max-width: 520px;
+  }
+
+  .item.from-right .item-fact { margin-left: auto; }
+
+  /* ===== MILESTONES ===== */
+  .milestone {
+    text-align: center;
+    padding: 50px 20px;
+    opacity: 0;
+    transform: scale(0.95);
+    transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .milestone.visible { opacity: 1; transform: scale(1); }
+
+  .milestone-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: clamp(0.72rem, 1.4vw, 0.88rem);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 12px 28px;
+    border: 1px solid;
+    border-radius: 100px;
+    display: inline-block;
+    opacity: 0.55;
+  }
+
+  /* ===== ZONE COLORS ===== */
+
+  .zone-surface {
+    background: linear-gradient(180deg, #7ec8d8 0%, #5ab0c8 15%, #3a98b8 30%, #2a7fa8 50%, #1a5a7a 75%, #0e3a5a 100%);
+    min-height: 2800px;
+  }
+  .zone-surface .zone-name, .zone-surface .zone-depth { color: #1a3a4a; }
+  .zone-surface .zone-line { background: #1a3a4a; }
+  .zone-surface .item-name { color: #0e2a3a; }
+  .zone-surface .item-fact { color: #1a3a4a; }
+  .zone-surface .milestone-text { color: #1a3a4a; border-color: rgba(26,58,74,0.3); }
+  .zone-surface .item-icon { background: rgba(255,255,255,0.22); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); }
+
+  .zone-twilight {
+    background: linear-gradient(180deg, #0e3a5a 0%, #0a2a4a 20%, #08203a 40%, #06182e 60%, #041222 80%, #030e1a 100%);
+    min-height: 3200px;
+  }
+  .zone-twilight .zone-name, .zone-twilight .zone-depth { color: #5ab8d0; }
+  .zone-twilight .zone-line { background: #5ab8d0; }
+  .zone-twilight .item-name { color: #8ad0e8; }
+  .zone-twilight .item-fact { color: #6ab0c8; }
+  .zone-twilight .milestone-text { color: #5ab8d0; border-color: rgba(90,184,208,0.3); }
+  .zone-twilight .item-icon { background: rgba(90,184,208,0.1); border: 1px solid rgba(90,184,208,0.12); }
+
+  .zone-midnight {
+    background: linear-gradient(180deg, #030e1a 0%, #020a14 25%, #01070f 50%, #01050b 75%, #000308 100%);
+    min-height: 3600px;
+  }
+  .zone-midnight .zone-name, .zone-midnight .zone-depth { color: #b388ff; }
+  .zone-midnight .zone-line { background: #b388ff; }
+  .zone-midnight .item-name { color: #c8a8ff; }
+  .zone-midnight .item-fact { color: #9a78d0; }
+  .zone-midnight .milestone-text { color: #b388ff; border-color: rgba(179,136,255,0.3); }
+  .zone-midnight .item-icon { background: rgba(179,136,255,0.08); border: 1px solid rgba(179,136,255,0.1); }
+
+  .zone-abyssal {
+    background: linear-gradient(180deg, #000308 0%, #000206 30%, #000104 60%, #000103 100%);
+    min-height: 3400px;
+  }
+  .zone-abyssal .zone-name, .zone-abyssal .zone-depth { color: #ff6d00; }
+  .zone-abyssal .zone-line { background: #ff6d00; }
+  .zone-abyssal .item-name { color: #ff9040; }
+  .zone-abyssal .item-fact { color: #c06a20; }
+  .zone-abyssal .milestone-text { color: #ff6d00; border-color: rgba(255,109,0,0.3); }
+  .zone-abyssal .item-icon { background: rgba(255,109,0,0.06); border: 1px solid rgba(255,109,0,0.08); }
+
+  .zone-hadal {
+    background: linear-gradient(180deg, #000103 0%, #000002 50%, #000000 100%);
+    min-height: 3000px;
+    padding-bottom: 200px;
+  }
+  .zone-hadal .zone-name, .zone-hadal .zone-depth { color: #ff4081; }
+  .zone-hadal .zone-line { background: #ff4081; }
+  .zone-hadal .item-name { color: #ff6098; }
+  .zone-hadal .item-fact { color: #c04070; }
+  .zone-hadal .milestone-text { color: #ff4081; border-color: rgba(255,64,129,0.3); }
+  .zone-hadal .item-icon { background: rgba(255,64,129,0.06); border: 1px solid rgba(255,64,129,0.08); }
+
+  .bottom {
+    text-align: center;
+    padding: 100px 20px 160px;
+    background: #000;
+  }
+  .bottom-title {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(1.5rem, 4vw, 2.5rem);
+    font-weight: 700;
+    color: rgba(255,255,255,0.12);
+    margin-bottom: 16px;
+  }
+  .bottom-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.06);
+    letter-spacing: 0.15em;
+  }
+
+  @media (max-width: 640px) {
+    .depth-meter { right: 10px; }
+    .item { flex-direction: column !important; text-align: left !important; gap: 14px; }
+    .item.from-right .item-fact { margin-left: 0; }
+    .item-icon { width: 72px !important; height: 72px !important; }
+    .zone-marker { flex-direction: column; text-align: center; gap: 8px; }
+    .zone-line { width: 60px; }
+  }
+</style>
+</head>
+<body>
+
+<section class="hero">
+  <h1 class="hero-title">
+    The Deep Code
+    <span>Scroll to explore the depths of programming</span>
+  </h1>
+  <div class="scroll-prompt">
+    <p>BEGIN DESCENT</p>
+    <div class="scroll-arrow"></div>
+  </div>
+</section>
+
+<div class="depth-meter" id="depthMeter">
+  <div class="depth-label">DEPTH</div>
+  <div class="depth-value" id="depthValue">0</div>
+  <div class="depth-unit">lines of understanding</div>
+</div>
+
+<div class="particles-container" id="particles"></div>
+
+<div class="deep-scroll" id="deepScroll">
+
+  <!-- ========== SURFACE ZONE ========== -->
+  <div class="layer zone-surface">
+    <div class="layer-content">
+
+      <div class="zone-marker" data-anim>
+        <div class="zone-line"></div>
+        <div><div class="zone-name">The Surface</div><div class="zone-depth">0 – 200 lines deep</div></div>
+        <div class="zone-line"></div>
+      </div>
+
+      <div class="item" data-anim>
+        <div class="item-icon">
+          <svg viewBox="0 0 64 64" fill="none"><rect x="8" y="12" width="48" height="36" rx="4" stroke="#1a3a4a" stroke-width="3" fill="none"/><text x="32" y="36" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9" font-weight="700" fill="#1a3a4a">&gt;_</text><rect x="22" y="52" width="20" height="4" rx="2" fill="#1a3a4a"/></svg>
+        </div>
+        <div>
+          <div class="item-name">Hello, World!</div>
+          <div class="item-fact">Every programmer's journey begins here. The tradition dates back to Brian Kernighan's 1978 book on C. Over 700 programming languages have their own version of this ritual.</div>
+        </div>
+      </div>
+
+      <div class="item from-right" data-anim>
+        <div class="item-icon">
+          <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/html5/html5-original.svg" alt="HTML5">
+        </div>
+        <div>
+          <div class="item-name">HTML & CSS</div>
+          <div class="item-fact">The skeleton and skin of the web. HTML was created by Tim Berners-Lee in 1993. Today, there are over 1.1 billion websites — all built on this foundation.</div>
+        </div>
+      </div>
+
+      <div class="item" data-anim>
+        <div class="item-icon">
+          <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/javascript/javascript-original.svg" alt="JavaScript">
+        </div>
+        <div>
+          <div class="item-name">JavaScript</div>
+          <div class="item-fact">Created in just 10 days by Brendan Eich in 1995. Despite its quirks — like [] + [] equaling an empty string — it became the most widely used programming language in the world.</div>
+        </div>
+      </div>
+
+      <div class="item from-right" data-anim>
+        <div class="item-icon">
+          <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/python/python-original.svg" alt="Python">
+        </div>
+        <div>
+          <div class="item-name">Python</div>
+          <div class="item-fact">Named after Monty Python, not the snake. It became the world's most popular language by prioritizing readability. Guido van Rossum created it during a Christmas holiday in 1989.</div>
+        </div>
+      </div>
+
+      <div class="item" data-anim>
+        <div class="item-icon">
+          <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/java/java-original.svg" alt="Java">
+        </div>
+        <div>
+          <div class="item-name">Java</div>
+          <div class="item-fact">"Write once, run anywhere" was the promise. Created by James Gosling in 1995. It powers 3 billion devices, runs most Android apps, and remains one of the most in-demand languages for enterprise software.</div>
+        </div>
+      </div>
+
+      <div class="milestone" data-anim>
+        <div class="milestone-text">✦ You've completed your first tutorial</div>
+      </div>
+
+      <div class="item from-right" data-anim>
+        <div class="item-icon">
+          <svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="24" r="12" stroke="#1a3a4a" stroke-width="2.5" fill="none"/><line x1="32" y1="24" x2="38" y2="19" stroke="#1a3a4a" stroke-width="2.5" stroke-linecap="round"/><path d="M22 42 C22 42, 25 36, 32 36 C39 36, 42 42, 42 42" stroke="#1a3a4a" stroke-width="2.5" stroke-linecap="round" fill="none"/><circle cx="22" cy="45" r="5" stroke="#1a3a4a" stroke-width="2" fill="none"/><circle cx="42" cy="45" r="5" stroke="#1a3a4a" stroke-width="2" fill="none"/></svg>
+        </div>
+        <div>
+          <div class="item-name">Your First Bug</div>
+          <div class="item-fact">The term "bug" dates to 1947 when a real moth was found in Harvard's Mark II computer. Debugging accounts for roughly 50% of a developer's time. Welcome to the profession.</div>
+        </div>
+      </div>
+
+      <div class="item" data-anim>
+        <div class="item-icon">
+          <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/stackoverflow/stackoverflow-original.svg" alt="Stack Overflow">
+        </div>
+        <div>
+          <div class="item-name">Stack Overflow</div>
+          <div class="item-fact">Founded in 2008, it became every developer's lifeline. At its peak, the site received over 6,000 questions per day. Many credit their entire careers to its existence.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ========== TWILIGHT ZONE ========== -->
+  <div class="layer zone-twilight">
+    <div class="layer-content">
+
+      <div class="zone-marker" data-anim>
+        <div class="zone-line"></div>
+        <div><div class="zone-name">The Twilight Zone</div><div class="zone-depth">200 – 500 lines deep</div></div>
+        <div class="zone-line"></div>
+      </div>
+
+      <div class="item" data-anim>
+        <div class="item-icon">
+          <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/npm/npm-original-wordmark.svg" alt="npm">
+        </div>
+        <div>
+          <div class="item-name">Functions & Modules</div>
+          <div class="item-fact">Breaking code into reusable pieces. The average npm package has 5 dependencies — but those have dependencies too. Installing a single package can pull in over 1,000 modules.</div>
+        </div>
+      </div>
+
+      <div class="item from-right" data-anim>
+        <div class="item-icon">
+          <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/csharp/csharp-original.svg" alt="C#">
+        </div>
+        <div>
+          <div class="item-name">Object-Oriented Programming</div>
+          <div class="item-fact">Alan Kay coined the term in the 1960s. He later said, "I made up the term OOP, and this is not what I had in mind." The four pillars — encapsulation, inheritance, polymorphism, abstraction — remain hotly debated.</div>
+        </div>
+      </div>
+
+      <div class="item" data-anim>
+        <div class="item-icon">
+          <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/postgresql/postgresql-original.svg" alt="PostgreSQL">
+        </div>
+        <div>
+          <div class="item-name">Databases</div>
+          <div class="item-fact">SQL was created in 1970 and still dominates. The NoSQL movement of the 2010s promised to replace it. Today, both coexist. The world creates about 2.5 quintillion bytes of data daily.</div>
+        </div>
+      </div>
+
+      <div class="milestone" data-anim>
+        <div class="milestone-text">✦ You can now build a to-do app</div>
+      </div>
+
+      <div class="item from-right" data-anim>
+        <div class="item-icon">
+          <svg viewBox="0 0 64 64" fill="none"><path d="M8 20 L30 20" stroke="#5ab8d0" stroke-width="2.5" stroke-linecap="round"/><path d="M34 20 L56 20" stroke="#5ab8d0" stroke-width="2.5" stroke-linecap="round"/><path d="M8 32 L30 32" stroke="#5ab8d0" stroke-width="2.5" stroke-linecap="round"/><path d="M34 32 L56 32" stroke="#5ab8d0" stroke-width="2.5" stroke-linecap="round"/><path d="M8 44 L30 44" stroke="#5ab8d0" stroke-width="2.5" stroke-linecap="round"/><path d="M34 44 L56 44" stroke="#5ab8d0" stroke-width="2.5" stroke-linecap="round"/><circle cx="32" cy="20" r="4" fill="#5ab8d0"/><circle cx="32" cy="32" r="4" fill="#5ab8d0"/><circle cx="32" cy="44" r="4" fill="#5ab8d0"/></svg>
+        </div>
+        <div>
+          <div class="item-name">APIs & REST</div>
+          <div class="item-fact">APIs let programs talk to each other. Roy Fielding defined REST in his 2000 PhD dissertation. Today, companies like Stripe and Twilio are built entirely around the idea of APIs as products.</div>
+        </div>
+      </div>
+
+      <div class="item" data-anim>
+        <div class="item-icon">
+          <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/git/git-original.svg" alt="Git">
+        </div>
+        <div>
+          <div class="item-name">Git & Version Control</div>
+          <div class="item-fact">Linus Torvalds created Git in 2005 — in just 10 days — because he was unhappy with existing tools. GitHub now hosts over 200 million repositories. A merge conflict still causes anxiety.</div>
+        </div>
+      </div>
+
+      <div class="item from-right" data-anim>
+        <div class="item-icon">
+          <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/react/react-original.svg" alt="React">
+        </div>
+        <div>
+          <div class="item-name">Frameworks</div>
+          <div class="item-fact">React, Vue, Angular, Django, Rails — frameworks rise and fall like empires. The average JavaScript framework has a half-life of about 3 years before something newer appears.</div>
+        </div>
+      </div>
+
+      <div class="item" data-anim>
+        <div class="item-icon">
+          <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/jest/jest-plain.svg" alt="Jest">
+        </div>
+        <div>
+          <div class="item-name">Testing</div>
+          <div class="item-fact">Unit tests, integration tests, end-to-end tests. Studies show that every dollar spent on testing saves $10 in maintenance. Yet many codebases have zero tests at all.</div>
+        </div>
+      </div>
+
+      <div class="item from-right" data-anim>
+        <div class="item-icon">
+          <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/docker/docker-original.svg" alt="Docker">
+        </div>
+        <div>
+          <div class="item-name">Docker & Containers</div>
+          <div class="item-fact">"Works on my machine" was a joke — until containers made it a guarantee. Docker launched in 2013 and changed deployment forever. The technology is based on Linux features from the early 2000s.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ========== MIDNIGHT ZONE ========== -->
+  <div class="layer zone-midnight">
+    <div class="layer-content">
+
+      <div class="zone-marker" data-anim>
+        <div class="zone-line"></div>
+        <div><div class="zone-name">The Midnight Zone</div><div class="zone-depth">500 – 800 lines deep</div></div>
+        <div class="zone-line"></div>
+      </div>
+
+      <div class="item" data-anim>
+        <div class="item-icon">
+          <svg viewBox="0 0 64 64" fill="none"><text x="6" y="14" font-family="JetBrains Mono,monospace" font-size="8" fill="#b388ff" opacity="0.5">O(1)</text><path d="M10 24 L10 56 L54 56" stroke="#b388ff" stroke-width="2" stroke-linecap="round"/><path d="M10 52 L30 48 L40 36 L48 28 L54 24" stroke="#39ff14" stroke-width="2.5" stroke-linecap="round" fill="none"/><path d="M10 52 L20 50 L30 44 L40 28 L44 18" stroke="#ff4081" stroke-width="2.5" stroke-linecap="round" fill="none" stroke-dasharray="4 3"/><text x="46" y="16" font-family="JetBrains Mono,monospace" font-size="7" fill="#ff4081">n²</text><text x="50" y="28" font-family="JetBrains Mono,monospace" font-size="7" fill="#39ff14">n</text></svg>
+        </div>
+        <div>
+          <div class="item-name">Algorithms & Big-O</div>
+          <div class="item-fact">The difference between O(n) and O(n²) is the difference between a page load taking 1 second or 11 days. Donald Knuth's "The Art of Computer Programming" has been in progress since 1962.</div>
+        </div>
+      </div>
+
+      <div class="item from-right" data-anim>
+        <div class="item-icon">
+          <svg viewBox="0 0 64 64" fill="none"><rect x="8" y="8" width="48" height="48" rx="6" stroke="#b388ff" stroke-width="2" fill="none"/><line x1="8" y1="24" x2="56" y2="24" stroke="#b388ff" stroke-width="1.5" opacity="0.3"/><line x1="8" y1="40" x2="56" y2="40" stroke="#b388ff" stroke-width="1.5" opacity="0.3"/><line x1="24" y1="8" x2="24" y2="56" stroke="#b388ff" stroke-width="1.5" opacity="0.3"/><line x1="40" y1="8" x2="40" y2="56" stroke="#b388ff" stroke-width="1.5" opacity="0.3"/><circle cx="32" cy="16" r="4" fill="#b388ff"/><circle cx="16" cy="32" r="4" fill="#b388ff" opacity="0.6"/><circle cx="48" cy="48" r="4" fill="#b388ff" opacity="0.4"/></svg>
+        </div>
+        <div>
+          <div class="item-name">Design Patterns</div>
+          <div class="item-fact">The Gang of Four cataloged 23 patterns in 1994. "Singleton" is both the most used and most criticized. Some argue patterns are just evidence of language limitations.</div>
+        </div>
+      </div>
+
+      <div class="milestone" data-anim>
+        <div class="milestone-text">✦ Most developers never go deeper than this</div>
+      </div>
+
+      <div class="item" data-anim>
+        <div class="item-icon">
+          <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/go/go-original-wordmark.svg" alt="Go">
+        </div>
+        <div>
+          <div class="item-name">Concurrency & Parallelism</div>
+          <div class="item-fact">Two of the most error-prone concepts in computing. A race condition once caused the Therac-25 radiation machine to deliver lethal doses. Go's goroutines made concurrent programming more accessible.</div>
+        </div>
+      </div>
+
+      <div class="item from-right" data-anim>
+        <div class="item-icon">
+          <svg viewBox="0 0 64 64" fill="none"><rect x="10" y="14" width="44" height="36" rx="6" stroke="#b388ff" stroke-width="2.5" fill="none"/><circle cx="32" cy="32" r="10" stroke="#b388ff" stroke-width="2" fill="none"/><circle cx="32" cy="32" r="3" fill="#b388ff"/><line x1="22" y1="14" x2="22" y2="50" stroke="#b388ff" stroke-width="1" opacity="0.2"/><line x1="42" y1="14" x2="42" y2="50" stroke="#b388ff" stroke-width="1" opacity="0.2"/><path d="M10 22 L54 22" stroke="#b388ff" stroke-width="1" opacity="0.2"/><path d="M10 42 L54 42" stroke="#b388ff" stroke-width="1" opacity="0.2"/></svg>
+        </div>
+        <div>
+          <div class="item-name">Cryptography</div>
+          <div class="item-fact">RSA encryption relies on the fact that multiplying two primes is easy, but factoring their product is astronomically hard. A 2048-bit RSA key would take classical computers billions of years to crack.</div>
+        </div>
+      </div>
+
+      <div class="item" data-anim>
+        <div class="item-icon">
+          <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/kubernetes/kubernetes-original.svg" alt="Kubernetes">
+        </div>
+        <div>
+          <div class="item-name">Distributed Systems</div>
+          <div class="item-fact">The CAP theorem proves you can only have two of three: consistency, availability, partition tolerance. Google's Spanner database attempts to cheat this using atomic clocks and GPS receivers.</div>
+        </div>
+      </div>
+
+      <div class="item from-right" data-anim>
+        <div class="item-icon">
+          <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/haskell/haskell-original.svg" alt="Haskell">
+        </div>
+        <div>
+          <div class="item-name">Functional Programming</div>
+          <div class="item-fact">Based on lambda calculus from the 1930s — older than electronic computers. Haskell enforces purity so strictly that performing I/O requires a concept called a "monad." Explaining monads is a running joke.</div>
+        </div>
+      </div>
+
+      <div class="item" data-anim>
+        <div class="item-icon">
+          <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/tensorflow/tensorflow-original.svg" alt="TensorFlow">
+        </div>
+        <div>
+          <div class="item-name">Machine Learning</div>
+          <div class="item-fact">Neural networks were first theorized in 1943. After two "AI winters" where funding dried up, deep learning exploded in 2012. GPT models now have hundreds of billions of parameters.</div>
+        </div>
+      </div>
+
+      <div class="item from-right" data-anim>
+        <div class="item-icon">
+          <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/rust/rust-original.svg" alt="Rust">
+        </div>
+        <div>
+          <div class="item-name">Memory Management</div>
+          <div class="item-fact">Garbage collectors handle it in most languages. In C/C++, a single forgotten free() can crash a space shuttle. Rust's borrow checker was invented to eliminate this entire class of bugs at compile time.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ========== ABYSSAL ZONE ========== -->
+  <div class="layer zone-abyssal">
+    <div class="layer-content">
+
+      <div class="zone-marker" data-anim>
+        <div class="zone-line"></div>
+        <div><div class="zone-name">The Abyssal Zone</div><div class="zone-depth">800 – 950 lines deep</div></div>
+        <div class="zone-line"></div>
+      </div>
+
+      <div class="item" data-anim>
+        <div class="item-icon">
+          <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/gcc/gcc-original.svg" alt="GCC">
+        </div>
+        <div>
+          <div class="item-name">Compilers & Interpreters</div>
+          <div class="item-fact">A compiler translates high-level code into machine instructions. GCC, one of the most important compilers ever, is over 15 million lines of code. Writing a compiler is a rite of passage.</div>
+        </div>
+      </div>
+
+      <div class="item from-right" data-anim>
+        <div class="item-icon">
+          <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/linux/linux-original.svg" alt="Linux">
+        </div>
+        <div>
+          <div class="item-name">Operating Systems</div>
+          <div class="item-fact">The Linux kernel has over 30 million lines of code contributed by thousands of developers. It runs on everything from wristwatches to supercomputers. Linus Torvalds started it as a hobby in 1991.</div>
+        </div>
+      </div>
+
+      <div class="milestone" data-anim>
+        <div class="milestone-text">✦ Very few programmers venture this deep</div>
+      </div>
+
+      <div class="item" data-anim>
+        <div class="item-icon">
+          <svg viewBox="0 0 64 64" fill="none"><text x="4" y="14" font-family="JetBrains Mono,monospace" font-size="7" fill="#ff6d00" opacity="0.8">mov rax, 0x1</text><text x="4" y="24" font-family="JetBrains Mono,monospace" font-size="7" fill="#ff9040" opacity="0.6">mov rdi, 0x1</text><text x="4" y="34" font-family="JetBrains Mono,monospace" font-size="7" fill="#ff6d00" opacity="0.5">lea rsi,[msg]</text><text x="4" y="44" font-family="JetBrains Mono,monospace" font-size="7" fill="#ff9040" opacity="0.4">mov rdx, 0xe</text><text x="4" y="54" font-family="JetBrains Mono,monospace" font-size="7" fill="#ff6d00" opacity="0.7">syscall</text><line x1="50" y1="8" x2="50" y2="58" stroke="#ff6d00" stroke-width="1" opacity="0.15"/></svg>
+        </div>
+        <div>
+          <div class="item-name">Assembly Language</div>
+          <div class="item-fact">One step above raw machine code. Each instruction maps directly to a CPU operation. Demoscene programmers write entire 3D animations in just 4KB of assembly — smaller than this paragraph in Unicode.</div>
+        </div>
+      </div>
+
+      <div class="item from-right" data-anim>
+        <div class="item-icon">
+          <svg viewBox="0 0 64 64" fill="none"><rect x="14" y="14" width="36" height="36" rx="4" stroke="#ff6d00" stroke-width="2" fill="none"/><rect x="20" y="20" width="10" height="10" rx="1" fill="#ff6d00" opacity="0.6"/><rect x="34" y="20" width="10" height="10" rx="1" fill="#ff6d00" opacity="0.4"/><rect x="20" y="34" width="10" height="10" rx="1" fill="#ff6d00" opacity="0.3"/><rect x="34" y="34" width="10" height="10" rx="1" fill="#ff6d00" opacity="0.5"/><line x1="6" y1="32" x2="14" y2="32" stroke="#ff9040" stroke-width="1.5"/><line x1="50" y1="32" x2="58" y2="32" stroke="#ff9040" stroke-width="1.5"/><line x1="32" y1="6" x2="32" y2="14" stroke="#ff9040" stroke-width="1.5"/><line x1="32" y1="50" x2="32" y2="58" stroke="#ff9040" stroke-width="1.5"/><circle cx="6" cy="32" r="2" fill="#ff9040"/><circle cx="58" cy="32" r="2" fill="#ff9040"/><circle cx="32" cy="6" r="2" fill="#ff9040"/><circle cx="32" cy="58" r="2" fill="#ff9040"/></svg>
+        </div>
+        <div>
+          <div class="item-name">CPU Architecture</div>
+          <div class="item-fact">Modern CPUs execute instructions out of order, predict branches before they happen, and run billions of cycles per second. A single transistor today is about the size of a strand of DNA.</div>
+        </div>
+      </div>
+
+      <div class="item" data-anim>
+        <div class="item-icon">
+          <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/c/c-original.svg" alt="C">
+        </div>
+        <div>
+          <div class="item-name">Kernel Development</div>
+          <div class="item-fact">Writing kernel code means one bug can crash the entire system — or silently corrupt data. There is no safety net, no garbage collector, no debugger. Only you, the hardware, and the void.</div>
+        </div>
+      </div>
+
+      <div class="item from-right" data-anim>
+        <div class="item-icon">
+          <svg viewBox="0 0 64 64" fill="none"><text x="6" y="16" font-family="JetBrains Mono,monospace" font-size="6" fill="#ff6d00" opacity="0.7">4D 5A 90 00</text><text x="6" y="26" font-family="JetBrains Mono,monospace" font-size="6" fill="#ff9040" opacity="0.5">03 00 00 00</text><text x="6" y="36" font-family="JetBrains Mono,monospace" font-size="6" fill="#ff6d00" opacity="0.4">04 00 00 00</text><text x="6" y="46" font-family="JetBrains Mono,monospace" font-size="6" fill="#ff9040" opacity="0.3">FF FF 00 00</text><path d="M42 10 L58 10 L58 56 L42 56 Z" stroke="#ff6d00" stroke-width="1.5" fill="none" opacity="0.3"/><circle cx="50" cy="50" r="4" stroke="#ff6d00" stroke-width="1.5" fill="none"/><path d="M53 53 L57 57" stroke="#ff6d00" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </div>
+        <div>
+          <div class="item-name">Reverse Engineering</div>
+          <div class="item-fact">Reading compiled binary code to understand what a program does. Security researchers use it to find vulnerabilities. It requires understanding assembly, memory layout, and thinking like the original programmer.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ========== HADAL ZONE ========== -->
+  <div class="layer zone-hadal">
+    <div class="layer-content">
+
+      <div class="zone-marker" data-anim>
+        <div class="zone-line"></div>
+        <div><div class="zone-name">The Hadal Zone</div><div class="zone-depth">950 – 1000 lines deep</div></div>
+        <div class="zone-line"></div>
+      </div>
+
+      <div class="item" data-anim>
+        <div class="item-icon">
+          <svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="22" stroke="#ff4081" stroke-width="2" fill="none" opacity="0.3"/><path d="M22 22 L42 42" stroke="#ff4081" stroke-width="2.5" stroke-linecap="round"/><path d="M42 22 L22 42" stroke="#ff4081" stroke-width="2.5" stroke-linecap="round" opacity="0.5"/><text x="32" y="58" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="6" fill="#ff4081" opacity="0.6">HALT?</text><circle cx="32" cy="32" r="4" fill="#ff4081" opacity="0.6"/></svg>
+        </div>
+        <div>
+          <div class="item-name">The Halting Problem</div>
+          <div class="item-fact">Alan Turing proved in 1936 that no program can determine whether any arbitrary program will finish running or loop forever. This single proof drew a permanent boundary around what computation can achieve.</div>
+        </div>
+      </div>
+
+      <div class="item from-right" data-anim>
+        <div class="item-icon">
+          <svg viewBox="0 0 64 64" fill="none"><circle cx="20" cy="32" r="14" stroke="#ff4081" stroke-width="2" fill="none"/><circle cx="44" cy="32" r="14" stroke="#ff6098" stroke-width="2" fill="none"/><text x="20" y="35" text-anchor="middle" font-family="Syne,sans-serif" font-size="12" font-weight="800" fill="#ff4081">P</text><text x="44" y="35" text-anchor="middle" font-family="Syne,sans-serif" font-size="10" font-weight="800" fill="#ff6098">NP</text><text x="32" y="58" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#ff4081" opacity="0.5">=  ?</text></svg>
+        </div>
+        <div>
+          <div class="item-name">P vs NP</div>
+          <div class="item-fact">The most important open question in computer science. If P equals NP, every problem whose solution can be verified quickly can also be solved quickly. A proof either way carries a $1,000,000 prize.</div>
+        </div>
+      </div>
+
+      <div class="milestone" data-anim>
+        <div class="milestone-text">✦ You've reached the theoretical foundations of computing</div>
+      </div>
+
+      <div class="item" data-anim>
+        <div class="item-icon">
+          <svg viewBox="0 0 64 64" fill="none"><text x="32" y="24" text-anchor="middle" font-family="serif" font-size="26" font-style="italic" fill="#ff4081">λ</text><path d="M14 36 L50 36" stroke="#ff4081" stroke-width="1" opacity="0.3"/><text x="32" y="48" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="6" fill="#ff4081" opacity="0.5">(λx.λy.x y)</text><text x="32" y="58" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="5.5" fill="#ff6098" opacity="0.4">Church, 1936</text></svg>
+        </div>
+        <div>
+          <div class="item-name">Lambda Calculus</div>
+          <div class="item-fact">Alonzo Church invented it in the 1930s — a formal system using only functions. It's mathematically equivalent to a Turing machine. Every programming language is, at its core, a dialect of lambda calculus.</div>
+        </div>
+      </div>
+
+      <div class="item from-right" data-anim>
+        <div class="item-icon">
+          <svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="20" stroke="#ff4081" stroke-width="1.5" fill="none" opacity="0.3"/><circle cx="32" cy="32" r="12" stroke="#ff6098" stroke-width="1.5" fill="none" opacity="0.4"/><circle cx="32" cy="32" r="4" fill="#ff4081" opacity="0.6"/><ellipse cx="32" cy="32" rx="22" ry="10" stroke="#ff4081" stroke-width="1.5" fill="none" opacity="0.25" transform="rotate(45 32 32)"/><ellipse cx="32" cy="32" rx="22" ry="10" stroke="#ff4081" stroke-width="1.5" fill="none" opacity="0.25" transform="rotate(-45 32 32)"/><circle cx="22" cy="20" r="2.5" fill="#ff4081" opacity="0.8"/><circle cx="44" cy="40" r="2.5" fill="#ff6098" opacity="0.5"/><text x="32" y="60" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="5.5" fill="#ff4081" opacity="0.4">|0⟩ + |1⟩</text></svg>
+        </div>
+        <div>
+          <div class="item-name">Quantum Computing</div>
+          <div class="item-fact">Qubits can be 0 and 1 simultaneously through superposition. Shor's algorithm could break RSA — but we'd need millions of stable qubits. Current quantum computers have only a few thousand, most plagued by errors.</div>
+        </div>
+      </div>
+
+      <div class="item" data-anim>
+        <div class="item-icon">
+          <svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="28" r="18" stroke="#ff4081" stroke-width="2" fill="none" opacity="0.3"/><text x="32" y="28" text-anchor="middle" font-family="serif" font-size="16" font-style="italic" fill="#ff4081">G</text><path d="M20 38 L20 42 C20 48, 26 54, 32 54 C38 54, 44 48, 44 42 L44 38" stroke="#ff4081" stroke-width="1.5" fill="none" opacity="0.4" stroke-dasharray="3 2"/><text x="32" y="52" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="5" fill="#ff4081" opacity="0.5">incomplete</text></svg>
+        </div>
+        <div>
+          <div class="item-name">Gödel's Incompleteness Theorems</div>
+          <div class="item-fact">In 1931, Kurt Gödel proved that any consistent mathematical system complex enough to describe arithmetic must contain truths that cannot be proven within it. There will always be things we know are true but can never prove.</div>
+        </div>
+      </div>
+
+      <div class="item from-right" data-anim>
+        <div class="item-icon">
+          <svg viewBox="0 0 64 64" fill="none"><rect x="4" y="26" width="56" height="12" rx="2" stroke="#ff4081" stroke-width="2" fill="none" opacity="0.4"/><rect x="20" y="22" width="8" height="20" rx="2" stroke="#ff4081" stroke-width="2" fill="none"/><line x1="22" y1="32" x2="26" y2="32" stroke="#ff4081" stroke-width="2" stroke-linecap="round"/><rect x="8" y="30" width="4" height="4" fill="#ff4081" opacity="0.6"/><rect x="14" y="30" width="4" height="4" fill="none" stroke="#ff4081" stroke-width="1"/><rect x="32" y="30" width="4" height="4" fill="#ff4081" opacity="0.4"/><rect x="38" y="30" width="4" height="4" fill="#ff4081" opacity="0.6"/><rect x="44" y="30" width="4" height="4" fill="none" stroke="#ff4081" stroke-width="1"/><rect x="50" y="30" width="4" height="4" fill="#ff4081" opacity="0.3"/><text x="32" y="54" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="5.5" fill="#ff4081" opacity="0.4">Turing, 1936</text></svg>
+        </div>
+        <div>
+          <div class="item-name">The Turing Machine</div>
+          <div class="item-fact">A theoretical device with infinite tape, a read/write head, and a set of rules. Despite its simplicity, it can compute anything any computer can. Every laptop and server is just a finite approximation of this 1936 thought experiment.</div>
+        </div>
+      </div>
+
+      <div class="item" data-anim>
+        <div class="item-icon">
+          <svg viewBox="0 0 64 64" fill="none"><rect x="8" y="8" width="48" height="48" rx="4" fill="#ff4081" opacity="0.05" stroke="#ff4081" stroke-width="1.5"/><text x="32" y="26" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#ff4081" opacity="0.7">BB(5) =</text><text x="32" y="40" text-anchor="middle" font-family="Syne,sans-serif" font-size="8" font-weight="700" fill="#ff4081">47,176,870</text><text x="32" y="52" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="6" fill="#ff4081" opacity="0.4">BB(6) = ???</text></svg>
+        </div>
+        <div>
+          <div class="item-name">The Busy Beaver Problem</div>
+          <div class="item-fact">How many 1s can a Turing machine with n states write before halting? For 5 states, the answer is 47,176,870. For 6 states, the number is so incomprehensibly large it cannot be computed. This function grows faster than any computable function.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- BOTTOM -->
+  <div class="bottom">
+    <div class="bottom-title">You've reached the bottom.</div>
+    <div class="bottom-sub">And yet, there's always deeper to go.</div>
+  </div>
+
+</div>
+
+<script>
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) entry.target.classList.add('visible');
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+  document.querySelectorAll('[data-anim]').forEach(el => observer.observe(el));
+
+  const depthMeter = document.getElementById('depthMeter');
+  const depthValue = document.getElementById('depthValue');
+  const deepScroll = document.getElementById('deepScroll');
+
+  function updateDepth() {
+    const scrollTop = window.scrollY;
+    const heroHeight = document.querySelector('.hero').offsetHeight;
+    const scrollArea = deepScroll.offsetHeight;
+    const progress = Math.min(1, Math.max(0, scrollTop - heroHeight) / scrollArea);
+    depthValue.textContent = Math.floor(progress * 1000).toLocaleString();
+    depthMeter.classList.toggle('visible', scrollTop > heroHeight * 0.5);
+  }
+
+  const particlesContainer = document.getElementById('particles');
+  const codeChars = ['{', '}', '(', ')', ';', '//', '=', '<', '>', '0', '1', '*', '&', '#', '=>', '::'];
+
+  for (let i = 0; i < 28; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.textContent = codeChars[Math.floor(Math.random() * codeChars.length)];
+    p.style.left = Math.random() * 100 + '%';
+    p.style.top = Math.random() * 100 + '%';
+    p.style.fontSize = (Math.random() * 12 + 8) + 'px';
+    p.style.animationDuration = (Math.random() * 15 + 12) + 's';
+    p.style.animationDelay = (Math.random() * -20) + 's';
+    particlesContainer.appendChild(p);
+  }
+
+  function updateParticles() {
+    const scrollTop = window.scrollY;
+    const docHeight = document.documentElement.scrollHeight;
+    const progress = scrollTop / docHeight;
+    const heroH = document.querySelector('.hero').offsetHeight;
+
+    particlesContainer.querySelectorAll('.particle').forEach(p => {
+      if (scrollTop < heroH * 0.8) { p.style.opacity = '0'; return; }
+      const a = 0.04 + Math.random() * 0.05;
+      const colors = [[90,184,208],[179,136,255],[255,109,0],[255,64,129]];
+      const idx = Math.min(3, Math.floor(progress * 4));
+      const [r,g,b] = colors[idx];
+      p.style.color = `rgba(${r},${g},${b},${a})`;
+      p.style.opacity = String(a);
+    });
+  }
+
+  let ticking = false;
+  window.addEventListener('scroll', () => {
+    if (!ticking) {
+      requestAnimationFrame(() => { updateDepth(); updateParticles(); ticking = false; });
+      ticking = true;
+    }
+  });
+
+  updateDepth();
+  updateParticles();
+</script>
+</body>
+</html>
